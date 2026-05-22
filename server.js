@@ -45,6 +45,74 @@ app.get("/autocomplete", async (req, res) => {
       });
     }
 
+    const hasNumber = /\d/.test(query);
+
+    if (hasNumber) {
+      const addressResponse = await axios.get(
+        "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+        {
+          params: {
+            input: query,
+            key: GOOGLE_API_KEY,
+            components: "country:us",
+            language: "en",
+            region: "us",
+            types: "address"
+          }
+        }
+      );
+
+      const addressPredictions = addressResponse.data.predictions || [];
+      const businesses = [];
+      const seen = new Set();
+
+      for (const prediction of addressPredictions.slice(0, 3)) {
+        const detailsResponse = await axios.get(
+          "https://maps.googleapis.com/maps/api/place/details/json",
+          {
+            params: {
+              place_id: prediction.place_id,
+              key: GOOGLE_API_KEY,
+              fields: "geometry"
+            }
+          }
+        );
+
+        const location = detailsResponse.data.result?.geometry?.location;
+        if (!location) continue;
+
+        const nearbyResponse = await axios.get(
+          "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+          {
+            params: {
+              location: `${location.lat},${location.lng}`,
+              radius: 120,
+              type: "establishment",
+              key: GOOGLE_API_KEY,
+              language: "en"
+            }
+          }
+        );
+
+        const results = nearbyResponse.data.results || [];
+
+        results.forEach((item) => {
+          if (!seen.has(item.place_id)) {
+            seen.add(item.place_id);
+
+            businesses.push({
+              description: `${item.name}, ${item.vicinity || ""}`,
+              placeId: item.place_id
+            });
+          }
+        });
+      }
+
+      return res.json({
+        predictions: businesses.slice(0, 10)
+      });
+    }
+
     const response = await axios.get(
       "https://maps.googleapis.com/maps/api/place/autocomplete/json",
       {
@@ -53,7 +121,8 @@ app.get("/autocomplete", async (req, res) => {
           key: GOOGLE_API_KEY,
           components: "country:us",
           language: "en",
-          region: "us"
+          region: "us",
+          types: "establishment"
         }
       }
     );
