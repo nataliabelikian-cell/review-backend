@@ -50,7 +50,8 @@ app.get("/autocomplete", async (req, res) => {
           key: GOOGLE_API_KEY,
           components: "country:us",
           language: "en",
-          region: "us"
+          region: "us",
+          types: "establishment"
         }
       }
     );
