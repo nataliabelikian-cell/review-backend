@@ -45,34 +45,95 @@ app.get("/autocomplete", async (req, res) => {
       });
     }
 
+    const hasNumber = /\d/.test(query);
+
+    if (hasNumber) {
+      const autoResponse = await axios.get(
+        "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+        {
+          params: {
+            input: query,
+            key: GOOGLE_API_KEY,
+            components: "country:us",
+            language: "en",
+            region: "us"
+          }
+        }
+      );
+
+      const addressPredictions = autoResponse.data.predictions || [];
+      const allBusinesses = [];
+
+      for (const prediction of addressPredictions.slice(0, 3)) {
+        const detailsResponse = await axios.get(
+          "https://maps.googleapis.com/maps/api/place/details/json",
+          {
+            params: {
+              place_id: prediction.place_id,
+              key: GOOGLE_API_KEY,
+              fields: "geometry"
+            }
+          }
+        );
+
+        const location = detailsResponse.data.result?.geometry?.location;
+        if (!location) continue;
+
+        const nearbyResponse = await axios.get(
+          "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+          {
+            params: {
+              location: `${location.lat},${location.lng}`,
+              radius: 150,
+              type: "establishment",
+              key: GOOGLE_API_KEY,
+              language: "en"
+            }
+          }
+        );
+
+        const businesses = nearbyResponse.data.results || [];
+
+        businesses.forEach((item) => {
+          allBusinesses.push({
+            description: `${item.name}, ${item.vicinity || ""}`,
+            placeId: item.place_id
+          });
+        });
+      }
+
+      const unique = [];
+      const seen = new Set();
+
+      allBusinesses.forEach((item) => {
+        if (!seen.has(item.placeId)) {
+          seen.add(item.placeId);
+          unique.push(item);
+        }
+      });
+
+      return res.json({
+        predictions: unique.slice(0, 8)
+      });
+    }
+
     const response = await axios.get(
-      "https://maps.googleapis.com/maps/api/place/textsearch/json",
+      "https://maps.googleapis.com/maps/api/place/autocomplete/json",
       {
         params: {
-          query: query,
+          input: query,
           key: GOOGLE_API_KEY,
+          components: "country:us",
+          language: "en",
           region: "us",
-          language: "en"
+          types: "establishment"
         }
       }
     );
 
-    console.log("GOOGLE TEXT SEARCH:", response.data);
-
-    if (
-      response.data.status !== "OK" &&
-      response.data.status !== "ZERO_RESULTS"
-    ) {
-      return res.json({
-        predictions: [],
-        googleStatus: response.data.status,
-        googleError: response.data.error_message || null
-      });
-    }
-
     return res.json({
-      predictions: (response.data.results || []).slice(0, 8).map((item) => ({
-        description: `${item.name}, ${item.formatted_address || ""}`,
+      predictions: (response.data.predictions || []).map((item) => ({
+        description: item.description,
         placeId: item.place_id
       }))
     });
