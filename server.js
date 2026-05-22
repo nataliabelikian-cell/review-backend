@@ -86,7 +86,7 @@ app.get("/autocomplete", async (req, res) => {
           {
             params: {
               location: `${location.lat},${location.lng}`,
-              radius: 120,
+              radius: 500,
               type: "establishment",
               key: GOOGLE_API_KEY,
               language: "en"
@@ -109,7 +109,7 @@ app.get("/autocomplete", async (req, res) => {
       }
 
       return res.json({
-        predictions: businesses.slice(0, 10)
+        predictions: businesses.slice(0, 20)
       });
     }
 
