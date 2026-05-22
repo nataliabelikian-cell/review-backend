@@ -22,7 +22,26 @@ app.get("/autocomplete", async (req, res) => {
     if (!query || query.length < 2) {
       return res.json({ predictions: [] });
     }
-
+    if (isPhoneQuery(query)) {
+      const phoneResponse = await axios.get(
+        "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
+        {
+          params: {
+            input: query,
+            inputtype: "phonenumber",
+            key: GOOGLE_API_KEY,
+            fields: "name,formatted_address,place_id"
+          }
+        }
+      );
+    
+      return res.json({
+        predictions: (phoneResponse.data.candidates || []).map((item) => ({
+          description: `${item.name}, ${item.formatted_address || ""}`,
+          placeId: item.place_id
+        }))
+      });
+    }
     const response = await axios.get(
       "https://maps.googleapis.com/maps/api/place/autocomplete/json",
       {
