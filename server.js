@@ -17,28 +17,10 @@ function isPhoneQuery(query) {
 
 app.get("/autocomplete", async (req, res) => {
   try {
-    const query = req.query.q;
-    if (!query || query.length < 2) return res.json({ predictions: [] });
+    const query = req.query.q || req.query.query;
 
-    if (isPhoneQuery(query)) {
-      const response = await axios.get(
-        "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
-        {
-          params: {
-            input: query,
-            inputtype: "textquery",
-            key: GOOGLE_API_KEY,
-            fields: "name,formatted_address,place_id"
-          }
-        }
-      );
-
-      return res.json({
-        predictions: (response.data.candidates || []).map((item) => ({
-          description: `${item.name}, ${item.formatted_address || ""}`,
-          placeId: item.place_id
-        }))
-      });
+    if (!query || query.length < 2) {
+      return res.json({ predictions: [] });
     }
 
     const response = await axios.get(
@@ -54,15 +36,30 @@ app.get("/autocomplete", async (req, res) => {
       }
     );
 
-    res.json({
+    console.log("GOOGLE RESPONSE:", response.data);
+
+    if (response.data.status !== "OK") {
+      return res.json({
+        predictions: [],
+        googleStatus: response.data.status,
+        googleError: response.data.error_message || null
+      });
+    }
+
+    return res.json({
       predictions: (response.data.predictions || []).map((item) => ({
         description: item.description,
         placeId: item.place_id
       }))
     });
+
   } catch (error) {
     console.error("Autocomplete error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Autocomplete failed" });
+
+    return res.status(500).json({
+      error: "Autocomplete failed",
+      details: error.response?.data || error.message
+    });
   }
 });
 
