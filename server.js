@@ -4,6 +4,7 @@ const axios = require("axios");
 require("dotenv").config();
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -22,6 +23,7 @@ app.get("/autocomplete", async (req, res) => {
     if (!query || query.length < 2) {
       return res.json({ predictions: [] });
     }
+
     if (isPhoneQuery(query)) {
       const phoneResponse = await axios.get(
         "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
@@ -34,7 +36,7 @@ app.get("/autocomplete", async (req, res) => {
           }
         }
       );
-    
+
       return res.json({
         predictions: (phoneResponse.data.candidates || []).map((item) => ({
           description: `${item.name}, ${item.formatted_address || ""}`,
@@ -42,23 +44,25 @@ app.get("/autocomplete", async (req, res) => {
         }))
       });
     }
+
     const response = await axios.get(
-      "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+      "https://maps.googleapis.com/maps/api/place/textsearch/json",
       {
         params: {
-          input: query,
+          query: query,
           key: GOOGLE_API_KEY,
-          components: "country:us",
-          language: "en",
           region: "us",
-          types: "establishment"
+          language: "en"
         }
       }
     );
 
-    console.log("GOOGLE RESPONSE:", response.data);
+    console.log("GOOGLE TEXT SEARCH:", response.data);
 
-    if (response.data.status !== "OK") {
+    if (
+      response.data.status !== "OK" &&
+      response.data.status !== "ZERO_RESULTS"
+    ) {
       return res.json({
         predictions: [],
         googleStatus: response.data.status,
@@ -67,8 +71,8 @@ app.get("/autocomplete", async (req, res) => {
     }
 
     return res.json({
-      predictions: (response.data.predictions || []).map((item) => ({
-        description: item.description,
+      predictions: (response.data.results || []).slice(0, 8).map((item) => ({
+        description: `${item.name}, ${item.formatted_address || ""}`,
         placeId: item.place_id
       }))
     });
@@ -86,7 +90,10 @@ app.get("/autocomplete", async (req, res) => {
 app.get("/business-search", async (req, res) => {
   try {
     const query = req.query.q;
-    if (!query) return res.json({ predictions: [] });
+
+    if (!query) {
+      return res.json({ predictions: [] });
+    }
 
     const geoResponse = await axios.get(
       "https://maps.googleapis.com/maps/api/geocode/json",
@@ -120,22 +127,29 @@ app.get("/business-search", async (req, res) => {
 
     const results = nearbyResponse.data.results || [];
 
-    res.json({
+    return res.json({
       predictions: results.map((item) => ({
         description: `${item.name}, ${item.vicinity || ""}`,
         placeId: item.place_id
       }))
     });
+
   } catch (error) {
     console.error("Business search error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Business search failed" });
+
+    return res.status(500).json({
+      error: "Business search failed"
+    });
   }
 });
 
 app.get("/place-details", async (req, res) => {
   try {
     const placeId = req.query.place_id || req.query.placeId;
-    if (!placeId) return res.status(400).json({ error: "place_id is required" });
+
+    if (!placeId) {
+      return res.status(400).json({ error: "place_id is required" });
+    }
 
     const response = await axios.get(
       "https://maps.googleapis.com/maps/api/place/details/json",
@@ -143,7 +157,8 @@ app.get("/place-details", async (req, res) => {
         params: {
           place_id: placeId,
           key: GOOGLE_API_KEY,
-          fields: "name,formatted_address,rating,user_ratings_total,photos,formatted_phone_number,website,place_id,url,types"
+          fields:
+            "name,formatted_address,rating,user_ratings_total,photos,formatted_phone_number,website,place_id,url,types"
         }
       }
     );
@@ -151,11 +166,12 @@ app.get("/place-details", async (req, res) => {
     const place = response.data.result || {};
 
     let image = "";
+
     if (place.photos?.length) {
       image = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${place.photos[0].photo_reference}&key=${GOOGLE_API_KEY}`;
     }
 
-    res.json({
+    return res.json({
       name: place.name || "",
       address: place.formatted_address || "",
       rating: place.rating || 0,
@@ -167,9 +183,13 @@ app.get("/place-details", async (req, res) => {
       locationLink: place.url || "",
       types: place.types || []
     });
+
   } catch (error) {
     console.error("Place details error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Place details failed" });
+
+    return res.status(500).json({
+      error: "Place details failed"
+    });
   }
 });
 
@@ -194,7 +214,9 @@ app.get("/reviews", async (req, res) => {
     }
 
     if (!url) {
-      return res.status(400).json({ error: "URL or placeId is required" });
+      return res.status(400).json({
+        error: "URL or placeId is required"
+      });
     }
 
     const response = await axios.get(
@@ -216,16 +238,18 @@ app.get("/reviews", async (req, res) => {
       response.data.data?.[0]?.[0]?.reviews_data ||
       [];
 
-    res.json({ reviews });
+    return res.json({ reviews });
 
   } catch (error) {
     console.error("Reviews error:", error.response?.data || error.message);
-    res.status(500).json({
+
+    return res.status(500).json({
       error: "Reviews failed",
       details: error.response?.data || error.message
     });
   }
 });
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
