@@ -311,7 +311,8 @@ app.get("/reviews", async (req, res) => {
       {
         params: {
           query: url,
-          reviewsLimit: 20,
+          reviewsLimit: 100,
+          sort: "newest",
           async: false
         },
         headers: {
