@@ -86,7 +86,7 @@ app.get("/autocomplete", async (req, res) => {
           {
             params: {
               location: `${location.lat},${location.lng}`,
-              radius: 500,
+              rankby: "distance",
               type: "establishment",
               key: GOOGLE_API_KEY,
               language: "en"
