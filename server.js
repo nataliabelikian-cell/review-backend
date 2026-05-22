@@ -45,49 +45,6 @@ app.get("/autocomplete", async (req, res) => {
       });
     }
 
-    const hasNumber = /\d/.test(query);
-
-    if (hasNumber) {
-      const geoResponse = await axios.get(
-        "https://maps.googleapis.com/maps/api/geocode/json",
-        {
-          params: {
-            address: query,
-            key: GOOGLE_API_KEY,
-            components: "country:US"
-          }
-        }
-      );
-
-      const location = geoResponse.data.results?.[0]?.geometry?.location;
-
-      if (!location) {
-        return res.json({ predictions: [] });
-      }
-
-      const nearbyResponse = await axios.get(
-        "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-        {
-          params: {
-            location: `${location.lat},${location.lng}`,
-            radius: 300,
-            type: "establishment",
-            key: GOOGLE_API_KEY,
-            language: "en"
-          }
-        }
-      );
-
-      const results = nearbyResponse.data.results || [];
-
-      return res.json({
-        predictions: results.slice(0, 10).map((item) => ({
-          description: `${item.name}, ${item.vicinity || ""}`,
-          placeId: item.place_id
-        }))
-      });
-    }
-
     const response = await axios.get(
       "https://maps.googleapis.com/maps/api/place/autocomplete/json",
       {
@@ -96,8 +53,7 @@ app.get("/autocomplete", async (req, res) => {
           key: GOOGLE_API_KEY,
           components: "country:us",
           language: "en",
-          region: "us",
-          types: "establishment"
+          region: "us"
         }
       }
     );
