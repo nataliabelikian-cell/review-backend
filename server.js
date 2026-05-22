@@ -174,8 +174,27 @@ app.get("/place-details", async (req, res) => {
 
 app.get("/reviews", async (req, res) => {
   try {
-    const url = req.query.url;
-    if (!url) return res.status(400).json({ error: "URL is required" });
+    let url = req.query.url;
+    const placeId = req.query.placeId || req.query.place_id;
+
+    if (!url && placeId) {
+      const detailsResponse = await axios.get(
+        "https://maps.googleapis.com/maps/api/place/details/json",
+        {
+          params: {
+            place_id: placeId,
+            key: GOOGLE_API_KEY,
+            fields: "url"
+          }
+        }
+      );
+
+      url = detailsResponse.data.result?.url;
+    }
+
+    if (!url) {
+      return res.status(400).json({ error: "URL or placeId is required" });
+    }
 
     const response = await axios.get(
       "https://api.app.outscraper.com/maps/reviews-v3",
@@ -196,13 +215,13 @@ app.get("/reviews", async (req, res) => {
       response.data.data?.[0]?.[0]?.reviews_data ||
       [];
 
-    res.json(reviews);
+    res.json({ reviews });
+
   } catch (error) {
     console.error("Reviews error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Reviews failed" });
+    res.status(500).json({
+      error: "Reviews failed",
+      details: error.response?.data || error.message
+    });
   }
-});
-
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
 });
