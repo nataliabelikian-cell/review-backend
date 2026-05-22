@@ -16,6 +16,20 @@ function isPhoneQuery(query) {
   return digits.length >= 7;
 }
 
+function getStreetSearchText(query) {
+  return query
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\b(avenue|ave)\b/g, "ave")
+    .replace(/\b(drive|dr)\b/g, "dr")
+    .replace(/\b(street|st)\b/g, "st")
+    .replace(/\b(road|rd)\b/g, "rd")
+    .replace(/\b(boulevard|blvd)\b/g, "blvd")
+    .replace(/\b(lane|ln)\b/g, "ln")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 app.get("/autocomplete", async (req, res) => {
   try {
     const query = req.query.q || req.query.query;
@@ -66,6 +80,9 @@ app.get("/autocomplete", async (req, res) => {
       const businesses = [];
       const seen = new Set();
 
+      const streetSearchText = getStreetSearchText(query);
+      const streetNumber = streetSearchText.match(/\d+/)?.[0] || "";
+
       for (const prediction of addressPredictions.slice(0, 3)) {
         const detailsResponse = await axios.get(
           "https://maps.googleapis.com/maps/api/place/details/json",
@@ -97,6 +114,12 @@ app.get("/autocomplete", async (req, res) => {
         const results = nearbyResponse.data.results || [];
 
         results.forEach((item) => {
+          const address = getStreetSearchText(item.vicinity || "");
+
+          if (streetNumber && !address.includes(streetNumber)) {
+            return;
+          }
+
           if (!seen.has(item.place_id)) {
             seen.add(item.place_id);
 
@@ -174,7 +197,7 @@ app.get("/business-search", async (req, res) => {
       {
         params: {
           location: `${location.lat},${location.lng}`,
-          radius: 120,
+          rankby: "distance",
           type: "establishment",
           key: GOOGLE_API_KEY,
           language: "en"
@@ -183,9 +206,16 @@ app.get("/business-search", async (req, res) => {
     );
 
     const results = nearbyResponse.data.results || [];
+    const streetSearchText = getStreetSearchText(query);
+    const streetNumber = streetSearchText.match(/\d+/)?.[0] || "";
+
+    const filtered = results.filter((item) => {
+      const address = getStreetSearchText(item.vicinity || "");
+      return streetNumber ? address.includes(streetNumber) : true;
+    });
 
     return res.json({
-      predictions: results.map((item) => ({
+      predictions: filtered.slice(0, 20).map((item) => ({
         description: `${item.name}, ${item.vicinity || ""}`,
         placeId: item.place_id
       }))
