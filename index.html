@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Platform Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fbfbfb;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 100px;
+            margin: 0;
+        }
+        
+        .container {
+            width: 386px;
+            position: relative; /* Создаем замкнутое пространство для точного позиционирования */
+        }
+
+        .search-block {
+            width: 100%;
+            text-align: left;
+            margin-bottom: 25px;
+        }
+
+        h2 {
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            color: #000000;
+        }
+
+        #custom-search-field {
+            width: 100%;
+            height: 50px;
+            border: 1px solid #000000;
+            background-color: #ffffff;
+            padding: 0 15px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        #custom-search-field:focus {
+            outline: none;
+            border-color: #666666;
+        }
+
+        /* КАРТОЧКА КОМПАНИИ: изначально жестко скрыта и прозрачна */
+        .my-company-card {
+            display: none;
+            width: 100%;
+            background: #ffffff;
+            border: 1px solid #e2e2e2;
+            padding: 20px;
+            box-sizing: border-box;
+            margin-top: 25px;
+            margin-bottom: 25px;
+            text-align: left;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .my-company-logo {
+            width: 100%;
+            height: 180px;
+            background: #f0f0f0;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .my-company-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .my-company-name {
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .my-company-address {
+            font-size: 13px;
+            color: #666666;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .my-company-rating {
+            font-size: 14px;
+            color: #000000;
+            font-weight: 600;
+        }
+
+        /* ЧЕРНАЯ КНОПКА: добавляем плавную анимацию движения */
+        .my-continue-btn {
+            display: block;
+            width: 100%;
+            height: 50px;
+            background-color: #000000;
+            color: #ffffff;
+            text-align: center;
+            line-height: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 13px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: transform 0.4s ease; /* Плавный сдвиг вверх-вниз */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="search-block">
+            <h2>Find your business</h2>
+            <input type="text" id="custom-search-field" placeholder="Search for your Google Business to get started...">
+        </div>
+
+        <a href="#" class="my-continue-btn" id="continue-btn">CONTINUE TO REVIEWS</a>
+
+        <div class="my-company-card" id="company-card">
+            <div class="my-company-logo" id="company-logo-container">
+                <img src="" id="company-logo" alt="Logo">
+            </div>
+            <div class="my-company-name" id="company-name">Company name</div>
+            <div class="my-company-address" id="company-address">Company address</div>
+            <div class="my-company-rating" id="company-rating">Rating</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const inputEl = document.getElementById('custom-search-field');
+            const cardEl = document.getElementById('company-card');
+            const nameEl = document.getElementById('company-name');
+            const addrEl = document.getElementById('company-address');
+            const rateEl = document.getElementById('company-rating');
+            const imgEl = document.getElementById('company-logo');
+            const continueBtn = document.getElementById('continue-btn');
+
+            // Высота карточки, на которую мы будем толкать кнопку вниз
+            const moveDistance = 340; 
+
+            // Сброс в исходное состояние (чистый минимализм)
+            function resetLayout() {
+                cardEl.style.display = 'none';
+                cardEl.style.opacity = '0';
+                if (continueBtn) {
+                    continueBtn.style.transform = 'translateY(0)';
+                }
+            }
+
+            // Перестановка элементов при успешном поиске
+            function showResultsLayout() {
+                // Толкаем кнопку вниз, освобождая место МЕЖДУ инпутом и кнопкой
+                if (continueBtn) {
+                    continueBtn.style.transform = `translateY(${moveDistance}px)`;
+                }
+
+                // Переставляем карточку в освободившееся место перед кнопкой
+                continueBtn.parentNode.insertBefore(cardEl, continueBtn);
+
+                // Плавно проявляем её
+                cardEl.style.display = 'block';
+                setTimeout(() => {
+                    cardEl.style.opacity = '1';
+                }, 50);
+            }
+
+            // На старте прячем карточку
+            resetLayout();
+
+            let typingTimer;
+            const doneTypingInterval = 600; 
+
+            if (inputEl) {
+                inputEl.addEventListener('input', function() {
+                    clearTimeout(typingTimer);
+                    const query = inputEl.value.trim();
+                    
+                    if (!query) {
+                        resetLayout();
+                        return;
+                    }
+
+                    typingTimer = setTimeout(async function() {
+                        try {
+                            // Стучимся на твой локальный сервер Node.js
+                            const response = await fetch(`http://localhost:3000/search?q=${encodeURIComponent(query)}`);
+                            if (!response.ok) return;
+
+                            const data = await response.json();
+
+                            if (data && data.name) {
+                                nameEl.innerText = data.name;
+                                addrEl.innerText = data.address || 'No address';
+                                
+                                // Выводим рейтинг и количество отзывов в скобках
+                                const countText = data.reviewsCount ? `(${data.reviewsCount} reviews)` : '(0 reviews)';
+                                rateEl.innerText = data.rating ? `Rating: ${data.rating} ★ ${countText}` : `No rating ${countText}`;
+                                
+                                if (data.image) {
+                                    imgEl.src = data.image;
+                                    document.getElementById('company-logo-container').style.display = 'block';
+                                } else {
+                                    document.getElementById('company-logo-container').style.display = 'none';
+                                }
+
+                                // Запускаем красивую анимацию сдвига
+                                showResultsLayout();
+
+                                // Обновляем ссылку для кнопки перехода к следующему шагу
+                                continueBtn.setAttribute('href', `http://localhost:3000/reviews?url=${encodeURIComponent(data.reviewsLink || '')}`);
+                            }
+                        } catch (error) {
+                            console.error("Ошибка локального Fetch:", error);
+                        }
+                    }, doneTypingInterval);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
